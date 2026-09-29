@@ -38,7 +38,10 @@ services:
   agent:
     build: .
     ports:
-      - "8000:8000"
+      # Dải cổng thay vì cổng cố định: docker compose up --scale agent=3
+      # sẽ map 3 container ra 8000, 8001, 8002 (cổng cố định sẽ bị
+      # "port is already allocated" khi scale)
+      - "8000-8002:8000"
     environment:
       # Secret lấy qua nội suy biến môi trường — compose tự đọc từ file .env
       # cạnh docker-compose.yml, KHÔNG hard-code khóa vào file này
