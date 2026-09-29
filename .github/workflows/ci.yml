@@ -1,0 +1,89 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Job 1: chạy test trên máy sạch của GitHub
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+    env:
+      # Máy CI không có .env — truyền giá trị giả (lợi ích 12-Factor)
+      AGENT_API_KEY: ci-dummy
+      REDIS_URL: "fake://"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Bỏ qua test_cp5 (gọi bản deploy thật) và test_bonus (tự tham chiếu badge)
+      - name: Run tests
+        run: pytest tests/ --ignore=tests/test_cp5.py --ignore=tests/test_bonus_cicd.py -m "not docker" -v
+
+  # Job 2: build Docker image trên máy sạch — bắt lỗi Dockerfile trước khi deploy
+  build:
+    name: Build Docker image
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build image (không push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: day12-agent:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Job 3: CHỈ deploy khi test + build xanh VÀ đang push vào main
+  deploy:
+    name: Deploy to Railway
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      # Token nằm trong GitHub Secrets, không bao giờ nằm trong file này
+      - name: Deploy
+        run: railway up --service agent --ci
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+
+      # Kiểm tra service còn sống sau deploy (thử lại tối đa 5 phút)
+      - name: Smoke test sau deploy
+        run: |
+          for i in $(seq 1 10); do
+            echo "lan thu $i..."
+            if curl -fsS --max-time 10 "${{ vars.PUBLIC_URL }}/health"; then
+              echo " -> service song, OK"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo " -> /health khong tra loi sau 5 phut"
+          exit 1
