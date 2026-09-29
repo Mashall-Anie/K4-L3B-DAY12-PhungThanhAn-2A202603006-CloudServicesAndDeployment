@@ -31,3 +31,6 @@ solution
 .DS_Store
 .idea
 .vscode
+
+# File so sánh cho exercises (không dùng deploy)
+Dockerfile.single

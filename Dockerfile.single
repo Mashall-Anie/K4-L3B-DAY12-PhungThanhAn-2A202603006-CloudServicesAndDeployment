@@ -1,0 +1,22 @@
+# ═══════════════════════════════════════════════════════════════════
+# Bản 1-stage GIỐNG HỆT Dockerfile starter ban đầu — KHÔNG dùng để deploy.
+#
+# Mục đích duy nhất: so sánh kích thước image với bản multi-stage
+# cho câu 3 trong exercises.md:
+#
+#   docker build -f Dockerfile.single -t agent:single .
+#   docker build -t agent:multi .
+#   docker images | grep agent
+# ═══════════════════════════════════════════════════════════════════
+
+FROM python:3.11
+
+WORKDIR /app
+
+COPY . .
+
+RUN pip install -r requirements.txt
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
