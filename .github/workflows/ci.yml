@@ -89,7 +89,16 @@ jobs:
 
       # Deploy xong phải kiểm tra service còn sống — PUBLIC_URL đặt trong
       # Settings → Secrets and variables → Actions → Variables
+      # Thử lại tới 10 lần x 30s vì deploy trên Railway có thể mất vài phút
       - name: Smoke test sau deploy
         run: |
-          sleep 45
-          curl -fsS "${{ vars.PUBLIC_URL }}/health"
+          for i in $(seq 1 10); do
+            echo "lan thu $i..."
+            if curl -fsS --max-time 10 "${{ vars.PUBLIC_URL }}/health"; then
+              echo " -> service song, OK"
+              exit 0
+            fi
+            sleep 30
+          done
+          echo " -> /health khong tra loi sau 5 phut"
+          exit 1
